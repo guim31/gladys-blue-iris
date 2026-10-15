@@ -1,61 +1,169 @@
-# Demo Devices Template
+# Blue Iris
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+## Overview
 
-## What you get
+This integration connects Gladys to **Blue Iris**, the video security software for Windows, through
+its local JSON interface (the one its own web interface uses). Nothing goes through a cloud.
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+- one device per camera: its image, whether it is online, sees motion or is triggered, and the person
+  and vehicle confirmed by the AI of Blue Iris when you use one;
+- a Blue Iris server device: active profile, arming signal (green, yellow, red), CPU load and clip
+  storage;
+- commands: change the profile, arm, trigger a camera, move a PTZ camera or send it to a preset.
+  Disarming is off by default, as for an alarm;
+- a scene trigger "Alert on a Blue Iris camera", with what was seen, and a dashboard widget.
+
+> **Developed without the hardware: feedback welcome.** This integration was written from the
+> documentation of the JSON interface of Blue Iris and from other integrations, without a Blue Iris
+> server at hand. Tell what works and what does not in the
+> [issues](https://github.com/guim31/gladys-blue-iris/issues).
+
+This integration is not affiliated with Perspective Software, the publisher of Blue Iris.
+
+## Requirements
+
+- Blue Iris 5 or later, with its **web server** on (Settings → Web server), reachable from Gladys
+  (port 81 by default).
+- A **dedicated Blue Iris user** for Gladys (Settings → Users), with a password:
+  - a plain user (not administrator) is enough to read the cameras, the profile and the alerts;
+  - allow it to **change profiles** to arm and change the profile from Gladys;
+  - allow it **PTZ** to move the cameras;
+  - triggering a camera needs an **administrator** in Blue Iris.
+- If the web server limits access ("Non-LAN only", auto-ban), the address of Gladys is on the LAN:
+  nothing to change. Blue Iris can ban an address after a few wrong passwords; the integration stops
+  at the first refusal.
 
 ## Configuration
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+In Gladys, **Integrations → Blue Iris → Configuration**:
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+| Setting                         | Role                                                                                                                           |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Server address**              | IP address or name of the Windows PC running Blue Iris, e.g. `192.168.1.20`.                                                   |
+| **Web server port**             | 81 unless you changed it in Blue Iris. A port written in the address wins.                                                     |
+| **HTTPS**                       | Only if the web server of Blue Iris serves HTTPS on this port. Its certificate is not checked.                                 |
+| **User name** / **Password**    | The dedicated Blue Iris user. The password is sent to Blue Iris only.                                                          |
+| **Refresh**                     | How often Blue Iris is read (5 s to 1 min, 10 s by default): motion, triggers and alerts are seen at this pace.                |
+| **Camera images**               | How often the image of each camera added to Gladys is refreshed (or "Only on alerts"). An alert always sends a fresh one.      |
+| **Hold the chosen profile**     | On (default): a profile chosen from Gladys stays, the schedule of Blue Iris no longer switches it. Off: until its next change. |
+| **Allow disarming from Gladys** | Off by default. See below.                                                                                                     |
+| **Other disarmed profiles**     | Profiles in which your cameras do not watch (e.g. `Home`), by name or number, separated by commas.                             |
+| **Language of the names**       | Language of the feature names and of the texts sent to scenes. Names are set when a device is added.                           |
 
-## Actions
+Then **Test the connection**: the report gives the server, the number of cameras, the active profile
+and the rights of the user. Open the **Discover** tab and add the server and the cameras you want.
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+**Arming and disarming.** Arming (green signal, any profile that watches) is always allowed. Disarming
+— the red signal, profile 0 "Inactive" (in which Blue Iris cameras do not trigger), or a profile
+listed in **Other disarmed profiles** — is refused until you turn on **Allow disarming from Gladys**:
+a disarming sent by mistake leaves the cameras blind. Disarming is never a switch: neither a voice
+assistant nor a dashboard toggle can do it by accident.
 
-## Scenes
+## Devices
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+### Blue Iris server
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+| Feature           | Meaning                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Online**        | Blue Iris answers.                                                                                           |
+| **Profile**       | The active profile (0 to 7, with the names of Blue Iris). A command: choose another one.                     |
+| **Arming signal** | **Armed (green)**, **Arming (yellow)** or **Disarmed (red)**. A command: green arms, red disarms if allowed. |
+| **CPU load**      | CPU load of the server, in %.                                                                                |
+| **Storage used**  | How full the clip storage of Blue Iris is, in %.                                                             |
+| **Free space**    | Free space of the clip disks, in GB.                                                                         |
 
-## Dashboard
+Profile and signal are read-only for a user who may not change profiles.
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+### Cameras
+
+One device per camera of Blue Iris (groups and the "all cameras" view are left out), named as in
+Blue Iris:
+
+| Feature             | Meaning                                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Image**           | The camera image, on the dashboard camera box.                                                            |
+| **Online**          | The camera is enabled and receives video.                                                                 |
+| **Motion**          | Blue Iris sees motion.                                                                                    |
+| **Triggered**       | The camera is triggered (recording, alerts per its settings).                                             |
+| **Person**          | An alert confirmed a person (AI). Appears once Blue Iris reported one.                                    |
+| **Vehicle**         | An alert confirmed a vehicle (AI). Appears once Blue Iris reported one.                                   |
+| **Pan, tilt, zoom** | PTZ cameras: the arrows and the zoom of the dashboard camera box. A move stops by itself after 2 seconds. |
+| **Preset position** | PTZ cameras with presets: go to a preset position saved in Blue Iris.                                     |
+
+**Person** and **Vehicle** stay on 30 seconds after the alert at least, then until the camera is no
+longer triggered. They appear in the Discover tab ("Update") the first time the AI of Blue Iris
+reports one; the alerts of the last 24 hours are read at start for this. The labels of the AI
+(CodeProject.AI, DeepStack…) are read from the alert memo: `person`, `car`, `truck`, `bus`,
+`motorcycle`, `bicycle`…
+
+## Dashboard widget
+
+The **Blue Iris** widget shows, for every camera or the one chosen in its settings:
+
+- the active profile, **Armed** / **Arming** / **Disarmed**, the cameras online and the alerts over 24
+  hours;
+- the last alerts with what was seen and the image taken at that moment;
+- an **Arm** button while not armed; **Disarm** only once allowed in the configuration, with a
+  confirmation; **Trigger** for the chosen camera.
+
+## Scene trigger
+
+**Alert on a Blue Iris camera**: Blue Iris raised an alert on a camera. Filters: the camera, and
+**What was seen**: Person, Vehicle, Animal, Motion, Sound, External trigger, Other alert (the most
+telling first: an alert with a person and motion is "Person"). The camera image is fresh when the
+scene starts. Variables: **Camera name**, **What was seen**, **AI labels** (the memo of Blue Iris,
+e.g. `person:87%`).
+
+Only the alerts Blue Iris keeps (not the ones its AI cancelled) start a scene, one scene event per
+alert. If the user may not read the alerts, an alert is still seen (as "Other alert") from the time
+of the last alert of the camera.
+
+## Scene actions
+
+- **Change the Blue Iris profile**: by name (`Away`) or number (`1`). A disarmed profile only if
+  allowed.
+- **Arm or disarm Blue Iris**: green arms; red disarms only if allowed.
+- **Trigger a Blue Iris camera**: as its "Trigger now" button (administrator in Blue Iris).
+- **Refresh a camera image**: takes a fresh image for Gladys, to send it in a message right after.
+
+## Scene examples
+
+- **Leaving home**: when the house alarm is armed → **Change the Blue Iris profile** to `Away`.
+- **Someone at the door at night**: **Alert on a Blue Iris camera**, camera "Front door", What was
+  seen = Person, between 22:00 and 6:00 → turn on the porch light, then send the camera image in a
+  Telegram message.
+- **Watch the gate**: a door opening sensor opens → **Trigger a Blue Iris camera** "Gate", then move
+  the PTZ camera to its preset "Gate".
+
+## Refresh and load
+
+Blue Iris is a local server without quota: the integration reads `status` and `camlist` at the
+**Refresh** interval (two small requests), and the alert list only for a camera with a new alert.
+Two requests at most are in flight. Images are asked scaled by Blue Iris (1280 px, then smaller if the
+image is over the 150 KB Gladys accepts): nothing is decoded in the container. An unchanged value is
+sent again every 6 hours, so the dashboard never says "no recent value".
 
 ## Troubleshooting
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+- **"Blue Iris does not answer"**: check the address, the port, that the web server of Blue Iris is on
+  and that the firewall of Windows lets Gladys in.
+- **"Password refused: stopped so Blue Iris does not ban Gladys"**: fix the user name or the password,
+  then **Test the connection** (one more try). Check in Blue Iris that the address of Gladys is not
+  banned.
+- **"No Blue Iris JSON interface at this address"**: wrong port, or another web server answers.
+- **"This Blue Iris user is not allowed to do this"**: give the right in Blue Iris (change profiles,
+  PTZ, administrator to trigger).
+- **Disarming refused**: on purpose, see "Arming and disarming".
+- **No Person / Vehicle feature**: the AI of Blue Iris has not reported one yet; it appears in
+  Discover ("Update") at the first one.
+- For details, set `LOG_LEVEL=debug` on the integration: every alert and read is then logged.
+
+## Limits
+
+- One Blue Iris server per integration.
+- No live video stream (Gladys shows images), no clip playback, no DIO outputs, no schedule change.
+- Motion and alerts are seen at the refresh pace (10 s by default), not instantly: Blue Iris pushes
+  its events by MQTT or web calls, which the sandbox of Gladys cannot receive here.
+- Yellow is a transition of Blue Iris (arming delay): it is shown, never sent.
+- Feature names are set when a device is added; groups of cameras are not devices.
+- Developed without the hardware: feedback welcome.

@@ -1,67 +1,182 @@
-# Template de démonstration
+# Blue Iris
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+## Présentation
 
-## Ce que vous obtenez
+Cette intégration relie Gladys à **Blue Iris**, le logiciel de vidéosurveillance pour Windows, par
+son interface JSON locale (celle de sa propre interface web). Rien ne passe par un cloud.
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+- un appareil par caméra : son image, si elle est en ligne, voit du mouvement ou est déclenchée, et la
+  personne ou le véhicule confirmés par l'IA de Blue Iris si vous en utilisez une ;
+- un appareil serveur Blue Iris : profil actif, signal d'armement (vert, jaune, rouge), charge CPU et
+  stockage des enregistrements ;
+- des commandes : changer de profil, armer, déclencher une caméra, orienter une caméra PTZ ou
+  l'envoyer sur une position mémorisée. Le désarmement est désactivé par défaut, comme pour une
+  alarme ;
+- un déclencheur de scène « Alerte sur une caméra Blue Iris », avec ce qui a été vu, et un widget de
+  tableau de bord.
+
+> **Developed without the hardware: feedback welcome.** Cette intégration a été écrite d'après la
+> documentation de l'interface JSON de Blue Iris et d'autres intégrations, sans serveur Blue Iris
+> sous la main. Dites ce qui marche et ce qui ne marche pas dans les
+> [issues](https://github.com/guim31/gladys-blue-iris/issues).
+
+Cette intégration n'est pas affiliée à Perspective Software, l'éditeur de Blue Iris.
+
+## Prérequis
+
+- Blue Iris 5 ou plus récent, avec son **serveur web** actif (Paramètres → Serveur web), joignable
+  depuis Gladys (port 81 par défaut).
+- Un **utilisateur Blue Iris dédié** à Gladys (Paramètres → Utilisateurs), avec un mot de passe :
+  - un simple utilisateur (non administrateur) suffit pour lire les caméras, le profil et les alertes ;
+  - autorisez-le à **changer de profil** pour armer et changer de profil depuis Gladys ;
+  - autorisez-lui le **PTZ** pour orienter les caméras ;
+  - déclencher une caméra demande un **administrateur** dans Blue Iris.
+- Si le serveur web limite l'accès (« Non-LAN only », bannissement automatique), l'adresse de Gladys
+  est sur le réseau local : rien à changer. Blue Iris peut bannir une adresse après quelques mauvais
+  mots de passe ; l'intégration s'arrête au premier refus.
 
 ## Configuration
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+Dans Gladys, **Intégrations → Blue Iris → Configuration** :
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+| Réglage                                    | Rôle                                                                                                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Adresse du serveur**                     | Adresse IP ou nom du PC Windows qui fait tourner Blue Iris, ex. `192.168.1.20`.                                                                  |
+| **Port du serveur web**                    | 81, sauf si vous l'avez changé dans Blue Iris. Un port écrit dans l'adresse l'emporte.                                                           |
+| **HTTPS**                                  | Seulement si le serveur web de Blue Iris sert du HTTPS sur ce port. Son certificat n'est pas vérifié.                                            |
+| **Nom d'utilisateur** / **Mot de passe**   | L'utilisateur Blue Iris dédié. Le mot de passe n'est envoyé qu'à Blue Iris.                                                                      |
+| **Rafraîchissement**                       | Fréquence de lecture de Blue Iris (5 s à 1 min, 10 s par défaut) : mouvements, déclenchements et alertes sont vus à ce rythme.                   |
+| **Images des caméras**                     | Fréquence de rafraîchissement de l'image des caméras ajoutées (ou « Seulement sur alerte »). Une alerte en envoie toujours une neuve.            |
+| **Garder le profil choisi**                | Activé (défaut) : un profil choisi depuis Gladys reste, le planning de Blue Iris ne le change plus. Désactivé : jusqu'à son prochain changement. |
+| **Autoriser le désarmement depuis Gladys** | Désactivé par défaut. Voir ci-dessous.                                                                                                           |
+| **Autres profils désarmés**                | Profils où vos caméras ne surveillent pas (ex. `Maison`), par nom ou numéro, séparés par des virgules.                                           |
+| **Langue des noms**                        | Langue des noms de fonctionnalités et des textes envoyés aux scènes. Les noms sont fixés à l'ajout d'un appareil.                                |
 
-## Actions
+Puis **Tester la connexion** : le rapport donne le serveur, le nombre de caméras, le profil actif et
+les droits de l'utilisateur. Ouvrez l'onglet **Découverte** et ajoutez le serveur et les caméras
+voulues.
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+**Armement et désarmement.** L'armement (signal vert, tout profil qui surveille) est toujours permis.
+Le désarmement — le signal rouge, le profil 0 « Inactive » (où les caméras Blue Iris ne se déclenchent
+pas), ou un profil listé dans **Autres profils désarmés** — est refusé tant que vous n'activez pas
+**Autoriser le désarmement depuis Gladys** : un désarmement envoyé par erreur laisse les caméras
+aveugles. Le désarmement n'est jamais un interrupteur : ni un assistant vocal ni un bouton du tableau
+de bord ne peut le faire par accident.
 
-## Scènes
+## Appareils
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+### Serveur Blue Iris
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+| Fonctionnalité        | Signification                                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **En ligne**          | Blue Iris répond.                                                                                                |
+| **Profil**            | Le profil actif (0 à 7, avec les noms de Blue Iris). Une commande : choisissez-en un autre.                      |
+| **Signal d'armement** | **Armé (vert)**, **Armement (jaune)** ou **Désarmé (rouge)**. Une commande : vert arme, rouge désarme si permis. |
+| **Charge CPU**        | Charge CPU du serveur, en %.                                                                                     |
+| **Stockage utilisé**  | Remplissage du stockage des enregistrements de Blue Iris, en %.                                                  |
+| **Espace libre**      | Espace libre des disques d'enregistrement, en Go.                                                                |
 
-## Tableau de bord
+Profil et signal sont en lecture seule pour un utilisateur qui ne peut pas changer de profil.
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+### Caméras
+
+Un appareil par caméra de Blue Iris (les groupes et la vue « toutes les caméras » sont écartés),
+nommé comme dans Blue Iris :
+
+| Fonctionnalité         | Signification                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Image**              | L'image de la caméra, dans la boîte caméra du tableau de bord.                                                           |
+| **En ligne**           | La caméra est activée et reçoit la vidéo.                                                                                |
+| **Mouvement**          | Blue Iris voit du mouvement.                                                                                             |
+| **Déclenchée**         | La caméra est déclenchée (enregistrement, alertes selon ses réglages).                                                   |
+| **Personne**           | Une alerte a confirmé une personne (IA). Apparaît dès que Blue Iris en a signalé une.                                    |
+| **Véhicule**           | Une alerte a confirmé un véhicule (IA). Apparaît dès que Blue Iris en a signalé un.                                      |
+| **Orientation (PTZ)**  | Caméras PTZ : les flèches et le zoom de la boîte caméra du tableau de bord. Un mouvement s'arrête seul après 2 secondes. |
+| **Position mémorisée** | Caméras PTZ avec positions : aller sur une position mémorisée dans Blue Iris.                                            |
+
+**Personne** et **Véhicule** restent actifs au moins 30 secondes après l'alerte, puis tant que la
+caméra est déclenchée. Ils apparaissent dans l'onglet Découverte (« Mettre à jour ») la première fois
+que l'IA de Blue Iris en signale un ; les alertes des dernières 24 heures sont lues au démarrage pour
+cela. Les étiquettes de l'IA (CodeProject.AI, DeepStack…) sont lues dans le mémo de l'alerte :
+`person`, `car`, `truck`, `bus`, `motorcycle`, `bicycle`…
+
+## Widget du tableau de bord
+
+Le widget **Blue Iris** affiche, pour toutes les caméras ou celle choisie dans ses réglages :
+
+- le profil actif, **Armée** / **Armement** / **Désarmée**, les caméras en ligne et les alertes sur 24
+  heures ;
+- les dernières alertes avec ce qui a été vu et l'image prise à ce moment ;
+- un bouton **Armer** tant que la surveillance n'est pas armée ; **Désarmer** seulement une fois
+  autorisé dans la configuration, avec une confirmation ; **Déclencher** pour la caméra choisie.
+
+## Déclencheur de scène
+
+**Alerte sur une caméra Blue Iris** : Blue Iris a levé une alerte sur une caméra. Filtres : la caméra,
+et **Ce qui a été vu** : Personne, Véhicule, Animal, Mouvement, Son, Déclenchement externe, Autre
+alerte (le plus parlant d'abord : une alerte avec une personne et du mouvement est « Personne »).
+L'image de la caméra est à jour quand la scène démarre. Variables : **Nom de la caméra**, **Ce qui a
+été vu**, **Étiquettes de l'IA** (le mémo de Blue Iris, ex. `person:87%`).
+
+Seules les alertes que Blue Iris garde (pas celles que son IA a annulées) lancent une scène, un
+événement par alerte. Si l'utilisateur ne peut pas lire les alertes, une alerte est quand même vue
+(comme « Autre alerte ») d'après l'heure de la dernière alerte de la caméra.
+
+## Actions de scène
+
+- **Changer le profil Blue Iris** : par nom (`Away`) ou numéro (`1`). Un profil désarmé seulement si
+  c'est permis.
+- **Armer ou désarmer Blue Iris** : vert arme ; rouge désarme seulement si c'est permis.
+- **Déclencher une caméra Blue Iris** : comme son bouton « Déclencher » (administrateur dans Blue
+  Iris).
+- **Rafraîchir l'image d'une caméra** : prend une image neuve pour Gladys, à envoyer ensuite dans un
+  message.
+
+## Exemples de scènes
+
+- **En partant** : quand l'alarme de la maison est armée → **Changer le profil Blue Iris** sur `Away`.
+- **Quelqu'un à la porte la nuit** : **Alerte sur une caméra Blue Iris**, caméra « Entrée », Ce qui a
+  été vu = Personne, entre 22 h et 6 h → allumer la lumière du perron, puis envoyer l'image de la
+  caméra dans un message Telegram.
+- **Surveiller le portail** : un détecteur d'ouverture s'ouvre → **Déclencher une caméra Blue Iris**
+  « Portail », puis orienter la caméra PTZ sur sa position mémorisée « Portail ».
+
+## Rafraîchissement et charge
+
+Blue Iris est un serveur local sans quota : l'intégration lit `status` et `camlist` au rythme du
+**Rafraîchissement** (deux petites requêtes), et la liste des alertes seulement pour une caméra qui a
+une nouvelle alerte. Deux requêtes au plus sont en cours. Les images sont demandées réduites par Blue
+Iris (1280 px, puis plus petites si l'image dépasse les 150 Ko acceptés par Gladys) : rien n'est
+décodé dans le conteneur. Une valeur inchangée est renvoyée toutes les 6 heures, pour que le tableau
+de bord n'affiche jamais « pas de valeur récente ».
 
 ## Dépannage
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+- **« Blue Iris ne répond pas »** : vérifiez l'adresse, le port, que le serveur web de Blue Iris est
+  actif et que le pare-feu de Windows laisse passer Gladys.
+- **« Mot de passe refusé : arrêt pour que Blue Iris ne bannisse pas Gladys »** : corrigez le nom
+  d'utilisateur ou le mot de passe, puis **Tester la connexion** (un essai de plus). Vérifiez dans
+  Blue Iris que l'adresse de Gladys n'est pas bannie.
+- **« Pas d'interface JSON Blue Iris à cette adresse »** : mauvais port, ou un autre serveur web
+  répond.
+- **« Cet utilisateur Blue Iris n'a pas ce droit »** : accordez le droit dans Blue Iris (changer de
+  profil, PTZ, administrateur pour déclencher).
+- **Désarmement refusé** : c'est voulu, voir « Armement et désarmement ».
+- **Pas de fonctionnalité Personne / Véhicule** : l'IA de Blue Iris n'en a pas encore signalé ; elle
+  apparaît dans Découverte (« Mettre à jour ») à la première.
+- Pour le détail, réglez `LOG_LEVEL=debug` sur l'intégration : chaque alerte et chaque lecture sont
+  alors journalisées.
+
+## Limites
+
+- Un seul serveur Blue Iris par intégration.
+- Pas de flux vidéo en direct (Gladys affiche des images), pas de lecture d'enregistrements, pas de
+  sorties DIO, pas de changement de planning.
+- Mouvements et alertes sont vus au rythme du rafraîchissement (10 s par défaut), pas instantanément :
+  Blue Iris pousse ses événements par MQTT ou appels web, que la sandbox de Gladys ne peut pas
+  recevoir ici.
+- Le jaune est une transition de Blue Iris (délai d'armement) : il est affiché, jamais envoyé.
+- Les noms des fonctionnalités sont fixés à l'ajout d'un appareil ; les groupes de caméras ne sont
+  pas des appareils.
+- Développée sans le matériel : vos retours sont les bienvenus (Developed without the hardware:
+  feedback welcome).

@@ -1,177 +1,708 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Blue Iris",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Blue Iris video security, locally: camera images, motion, AI alerts, profiles, PTZ.",
+    "fr": "Vidéosurveillance Blue Iris en local : images, mouvements, alertes IA, profils, PTZ.",
+    "de": "Blue-Iris-Videoüberwachung lokal: Bilder, Bewegung, KI-Alarme, Profile, PTZ.",
+    "es": "Videovigilancia Blue Iris en local: imágenes, movimiento, alertas IA, perfiles, PTZ."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "docker_image": "ghcr.io/guim31/gladys-blue-iris:1.0.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-blue-iris/main/cover.png",
+  "categories": ["security"],
+  "transports": ["local"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
-      "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+      "label": {
+        "en": "Your Blue Iris server",
+        "fr": "Votre serveur Blue Iris",
+        "de": "Dein Blue-Iris-Server",
+        "es": "Su servidor Blue Iris"
       },
-      "links": [
+      "description": {
+        "en": "Blue Iris must have its web server on (Settings → Web server). Create a dedicated Blue Iris user for Gladys: a plain user is enough to read; allow it to change profiles to arm from Gladys. Nothing goes through a cloud.",
+        "fr": "Le serveur web de Blue Iris doit être actif (Paramètres → Serveur web). Créez un utilisateur Blue Iris dédié à Gladys : un simple utilisateur suffit pour lire ; autorisez-le à changer de profil pour armer depuis Gladys. Rien ne passe par un cloud.",
+        "de": "Der Webserver von Blue Iris muss laufen (Einstellungen → Webserver). Lege einen eigenen Blue-Iris-Benutzer für Gladys an: Ein normaler Benutzer reicht zum Lesen; erlaube ihm Profilwechsel, um aus Gladys scharf zu schalten. Nichts läuft über eine Cloud.",
+        "es": "El servidor web de Blue Iris debe estar activo (Ajustes → Servidor web). Cree un usuario de Blue Iris dedicado a Gladys: un usuario normal basta para leer; permítale cambiar de perfil para armar desde Gladys. Nada pasa por una nube."
+      }
+    },
+    {
+      "key": "host",
+      "type": "string",
+      "label": {
+        "en": "Server address",
+        "fr": "Adresse du serveur",
+        "de": "Adresse des Servers",
+        "es": "Dirección del servidor"
+      },
+      "description": {
+        "en": "IP address or name of the Windows PC running Blue Iris.",
+        "fr": "Adresse IP ou nom du PC Windows qui fait tourner Blue Iris.",
+        "de": "IP-Adresse oder Name des Windows-PCs, auf dem Blue Iris läuft.",
+        "es": "Dirección IP o nombre del PC Windows que ejecuta Blue Iris."
+      },
+      "placeholder": {
+        "en": "e.g. 192.168.1.20",
+        "fr": "ex. 192.168.1.20",
+        "de": "z. B. 192.168.1.20",
+        "es": "p. ej. 192.168.1.20"
+      },
+      "required": true,
+      "default": ""
+    },
+    {
+      "key": "port",
+      "type": "number",
+      "label": {
+        "en": "Web server port",
+        "fr": "Port du serveur web",
+        "de": "Port des Webservers",
+        "es": "Puerto del servidor web"
+      },
+      "description": {
+        "en": "81 unless you changed it in Blue Iris.",
+        "fr": "81, sauf si vous l'avez changé dans Blue Iris.",
+        "de": "81, außer du hast ihn in Blue Iris geändert.",
+        "es": "81, salvo si lo cambió en Blue Iris."
+      },
+      "required": false,
+      "default": 81,
+      "min": 1,
+      "max": 65535
+    },
+    {
+      "key": "use_https",
+      "type": "boolean",
+      "label": {
+        "en": "HTTPS",
+        "fr": "HTTPS",
+        "de": "HTTPS",
+        "es": "HTTPS"
+      },
+      "description": {
+        "en": "Only if the web server of Blue Iris serves HTTPS on this port. Its certificate is not checked.",
+        "fr": "Seulement si le serveur web de Blue Iris sert du HTTPS sur ce port. Son certificat n'est pas vérifié.",
+        "de": "Nur wenn der Webserver von Blue Iris auf diesem Port HTTPS liefert. Sein Zertifikat wird nicht geprüft.",
+        "es": "Solo si el servidor web de Blue Iris sirve HTTPS en este puerto. Su certificado no se comprueba."
+      },
+      "required": false,
+      "default": false
+    },
+    {
+      "key": "username",
+      "type": "string",
+      "label": {
+        "en": "User name",
+        "fr": "Nom d'utilisateur",
+        "de": "Benutzername",
+        "es": "Nombre de usuario"
+      },
+      "required": true,
+      "default": ""
+    },
+    {
+      "key": "password",
+      "type": "secret",
+      "label": {
+        "en": "Password",
+        "fr": "Mot de passe",
+        "de": "Passwort",
+        "es": "Contraseña"
+      },
+      "description": {
+        "en": "Sent to Blue Iris only. Blue Iris can ban an address after wrong passwords: the integration stops at the first refusal.",
+        "fr": "Envoyé à Blue Iris seulement. Blue Iris peut bannir une adresse après des erreurs : l'intégration s'arrête au premier refus.",
+        "de": "Wird nur an Blue Iris gesendet. Blue Iris kann eine Adresse nach Fehlversuchen sperren: Die Integration stoppt bei der ersten Ablehnung.",
+        "es": "Solo se envía a Blue Iris. Blue Iris puede bloquear una dirección tras varios errores: la integración se detiene al primer rechazo."
+      },
+      "required": true
+    },
+    {
+      "key": "refresh_interval",
+      "type": "select",
+      "label": {
+        "en": "Refresh",
+        "fr": "Rafraîchissement",
+        "de": "Aktualisierung",
+        "es": "Actualización"
+      },
+      "description": {
+        "en": "How often Blue Iris is read: motion, triggers and alerts are seen at this pace.",
+        "fr": "Fréquence de lecture de Blue Iris : mouvements, déclenchements et alertes sont vus à ce rythme.",
+        "de": "Wie oft Blue Iris gelesen wird: Bewegung, Auslöser und Alarme werden in diesem Takt erkannt.",
+        "es": "Frecuencia de lectura de Blue Iris: movimientos, activaciones y alertas se ven a este ritmo."
+      },
+      "required": false,
+      "default": "10",
+      "options": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "value": "5",
+          "label": {
+            "en": "Every 5 seconds",
+            "fr": "Toutes les 5 secondes",
+            "de": "Alle 5 Sekunden",
+            "es": "Cada 5 segundos"
+          }
+        },
+        {
+          "value": "10",
+          "label": {
+            "en": "Every 10 seconds",
+            "fr": "Toutes les 10 secondes",
+            "de": "Alle 10 Sekunden",
+            "es": "Cada 10 segundos"
+          }
+        },
+        {
+          "value": "30",
+          "label": {
+            "en": "Every 30 seconds",
+            "fr": "Toutes les 30 secondes",
+            "de": "Alle 30 Sekunden",
+            "es": "Cada 30 segundos"
+          }
+        },
+        {
+          "value": "60",
+          "label": {
+            "en": "Every minute",
+            "fr": "Chaque minute",
+            "de": "Jede Minute",
+            "es": "Cada minuto"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
+      "key": "snapshot_interval",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "label": {
+        "en": "Camera images",
+        "fr": "Images des caméras",
+        "de": "Kamerabilder",
+        "es": "Imágenes de las cámaras"
+      },
+      "description": {
+        "en": "How often the image of each camera added to Gladys is refreshed. An alert always sends a fresh one.",
+        "fr": "Fréquence de rafraîchissement de l'image des caméras ajoutées. Une alerte en envoie toujours une neuve.",
+        "de": "Wie oft das Bild jeder hinzugefügten Kamera erneuert wird. Ein Alarm sendet immer ein neues.",
+        "es": "Frecuencia de actualización de la imagen de las cámaras añadidas. Una alerta siempre envía una nueva."
+      },
       "required": false,
-      "default": "celsius",
+      "default": "5",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "0",
+          "label": {
+            "en": "Only on alerts",
+            "fr": "Seulement sur alerte",
+            "de": "Nur bei Alarmen",
+            "es": "Solo con alertas"
+          }
+        },
+        {
+          "value": "1",
+          "label": {
+            "en": "Every minute",
+            "fr": "Chaque minute",
+            "de": "Jede Minute",
+            "es": "Cada minuto"
+          }
+        },
+        {
+          "value": "5",
+          "label": {
+            "en": "Every 5 minutes",
+            "fr": "Toutes les 5 minutes",
+            "de": "Alle 5 Minuten",
+            "es": "Cada 5 minutos"
+          }
+        },
+        {
+          "value": "15",
+          "label": {
+            "en": "Every 15 minutes",
+            "fr": "Toutes les 15 minutes",
+            "de": "Alle 15 Minuten",
+            "es": "Cada 15 minutos"
+          }
+        },
+        {
+          "value": "60",
+          "label": {
+            "en": "Every hour",
+            "fr": "Toutes les heures",
+            "de": "Jede Stunde",
+            "es": "Cada hora"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "security",
+      "type": "section",
+      "label": {
+        "en": "Arming and disarming",
+        "fr": "Armement et désarmement",
+        "de": "Scharf- und Unscharfschalten",
+        "es": "Armado y desarmado"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "Arming (green signal, any active profile) is always allowed. Disarming (red signal, profile 0 \"Inactive\" or the profiles listed below) is off by default, as for an alarm.",
+        "fr": "L'armement (signal vert, tout profil actif) est toujours permis. Le désarmement (signal rouge, profil 0 « Inactive » ou les profils listés ci-dessous) est désactivé par défaut, comme pour une alarme.",
+        "de": "Scharfschalten (grünes Signal, jedes aktive Profil) ist immer erlaubt. Unscharfschalten (rotes Signal, Profil 0 „Inactive“ oder die unten genannten Profile) ist standardmäßig aus, wie bei einer Alarmanlage.",
+        "es": "El armado (señal verde, cualquier perfil activo) siempre está permitido. El desarmado (señal roja, perfil 0 «Inactive» o los perfiles indicados abajo) está desactivado por defecto, como en una alarma."
+      }
+    },
+    {
+      "key": "hold_profile",
+      "type": "boolean",
+      "label": {
+        "en": "Hold the chosen profile",
+        "fr": "Garder le profil choisi",
+        "de": "Gewähltes Profil halten",
+        "es": "Mantener el perfil elegido"
+      },
+      "description": {
+        "en": "A profile chosen from Gladys stays until changed again, the schedule of Blue Iris no longer switches it. Off: until the next change of the schedule.",
+        "fr": "Un profil choisi depuis Gladys reste jusqu'au prochain choix, le planning de Blue Iris ne le change plus. Désactivé : jusqu'au prochain changement du planning.",
+        "de": "Ein aus Gladys gewähltes Profil bleibt bis zur nächsten Wahl, der Zeitplan von Blue Iris ändert es nicht mehr. Aus: bis zum nächsten Wechsel des Zeitplans.",
+        "es": "Un perfil elegido desde Gladys se mantiene hasta la próxima elección, el horario de Blue Iris ya no lo cambia. Desactivado: hasta el próximo cambio del horario."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": true
+    },
+    {
+      "key": "allow_disarm",
+      "type": "boolean",
+      "label": {
+        "en": "Allow disarming from Gladys",
+        "fr": "Autoriser le désarmement depuis Gladys",
+        "de": "Unscharfschalten aus Gladys erlauben",
+        "es": "Permitir desarmar desde Gladys"
+      },
+      "description": {
+        "en": "Off by default: a disarming sent by mistake (a scene, a tap) leaves the cameras blind.",
+        "fr": "Désactivé par défaut : un désarmement envoyé par erreur (une scène, un appui) laisse les caméras aveugles.",
+        "de": "Standardmäßig aus: Ein versehentliches Unscharfschalten (eine Szene, ein Tippen) macht die Kameras blind.",
+        "es": "Desactivado por defecto: un desarmado enviado por error (una escena, un toque) deja las cámaras ciegas."
+      },
+      "required": false,
+      "default": false
+    },
+    {
+      "key": "disarmed_profiles",
+      "type": "string",
+      "label": {
+        "en": "Other disarmed profiles",
+        "fr": "Autres profils désarmés",
+        "de": "Weitere unscharfe Profile",
+        "es": "Otros perfiles desarmados"
+      },
+      "description": {
+        "en": "Profiles in which your cameras do not watch (e.g. Home), by name or number, separated by commas. Profile 0 always counts.",
+        "fr": "Profils où vos caméras ne surveillent pas (ex. Maison), par nom ou numéro, séparés par des virgules. Le profil 0 compte toujours.",
+        "de": "Profile, in denen deine Kameras nicht überwachen (z. B. Zuhause), per Name oder Nummer, durch Kommas getrennt. Profil 0 zählt immer.",
+        "es": "Perfiles en los que sus cámaras no vigilan (p. ej. Casa), por nombre o número, separados por comas. El perfil 0 siempre cuenta."
+      },
+      "placeholder": {
+        "en": "e.g. Home",
+        "fr": "ex. Maison",
+        "de": "z. B. Zuhause",
+        "es": "p. ej. Casa"
+      },
+      "required": false,
+      "default": ""
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the names",
+        "fr": "Langue des noms",
+        "de": "Sprache der Namen",
+        "es": "Idioma de los nombres"
+      },
+      "description": {
+        "en": "Language of the feature names and of the texts sent to scenes. Names are set when a device is added.",
+        "fr": "Langue des noms de fonctionnalités et des textes envoyés aux scènes. Les noms sont fixés à l'ajout d'un appareil.",
+        "de": "Sprache der Funktionsnamen und der Texte für Szenen. Die Namen werden beim Hinzufügen festgelegt.",
+        "es": "Idioma de los nombres de funciones y de los textos enviados a las escenas. Se fijan al añadir un dispositivo."
+      },
+      "required": false,
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "English",
+            "de": "English",
+            "es": "English"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "Français",
+            "fr": "Français",
+            "de": "Français",
+            "es": "Français"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "Deutsch",
+            "fr": "Deutsch",
+            "de": "Deutsch",
+            "es": "Deutsch"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Español",
+            "fr": "Español",
+            "de": "Español",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "test_connection",
+      "label": {
+        "en": "Test the connection",
+        "fr": "Tester la connexion",
+        "de": "Verbindung testen",
+        "es": "Probar la conexión"
+      },
+      "timeout_seconds": 60
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "camera_alert",
+      "label": {
+        "en": "Alert on a Blue Iris camera",
+        "fr": "Alerte sur une caméra Blue Iris",
+        "de": "Alarm einer Blue-Iris-Kamera",
+        "es": "Alerta en una cámara Blue Iris"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "Blue Iris raised an alert on a camera, with what it saw (its AI says person or vehicle). The camera image is fresh.",
+        "fr": "Blue Iris a levé une alerte sur une caméra, avec ce qu'il a vu (son IA dit personne ou véhicule). L'image de la caméra est à jour.",
+        "de": "Blue Iris hat einen Alarm einer Kamera ausgelöst, mit dem, was es gesehen hat (seine KI sagt Person oder Fahrzeug). Das Kamerabild ist aktuell.",
+        "es": "Blue Iris generó una alerta en una cámara, con lo que vio (su IA indica persona o vehículo). La imagen de la cámara está al día."
       },
       "fields": [
         {
-          "key": "device",
+          "key": "camera",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "label": {
+            "en": "Camera",
+            "fr": "Caméra",
+            "de": "Kamera",
+            "es": "Cámara"
+          }
         },
         {
-          "key": "target",
+          "key": "detection",
           "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
+          "label": {
+            "en": "What was seen",
+            "fr": "Ce qui a été vu",
+            "de": "Was erkannt wurde",
+            "es": "Qué se vio"
+          },
           "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
+            {
+              "value": "person",
+              "label": {
+                "en": "Person",
+                "fr": "Personne",
+                "de": "Person",
+                "es": "Persona"
+              }
+            },
+            {
+              "value": "vehicle",
+              "label": {
+                "en": "Vehicle",
+                "fr": "Véhicule",
+                "de": "Fahrzeug",
+                "es": "Vehículo"
+              }
+            },
+            {
+              "value": "animal",
+              "label": {
+                "en": "Animal",
+                "fr": "Animal",
+                "de": "Tier",
+                "es": "Animal"
+              }
+            },
+            {
+              "value": "motion",
+              "label": {
+                "en": "Motion",
+                "fr": "Mouvement",
+                "de": "Bewegung",
+                "es": "Movimiento"
+              }
+            },
+            {
+              "value": "audio",
+              "label": {
+                "en": "Sound",
+                "fr": "Son",
+                "de": "Geräusch",
+                "es": "Sonido"
+              }
+            },
+            {
+              "value": "external",
+              "label": {
+                "en": "External trigger",
+                "fr": "Déclenchement externe",
+                "de": "Externer Auslöser",
+                "es": "Activación externa"
+              }
+            },
+            {
+              "value": "other",
+              "label": {
+                "en": "Other alert",
+                "fr": "Autre alerte",
+                "de": "Anderer Alarm",
+                "es": "Otra alerta"
+              }
+            }
           ]
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "camera_name",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Camera name",
+            "fr": "Nom de la caméra",
+            "de": "Name der Kamera",
+            "es": "Nombre de la cámara"
+          }
+        },
+        {
+          "key": "detection_name",
+          "type": "string",
+          "label": {
+            "en": "What was seen",
+            "fr": "Ce qui a été vu",
+            "de": "Was erkannt wurde",
+            "es": "Qué se vio"
+          }
+        },
+        {
+          "key": "memo",
+          "type": "string",
+          "label": {
+            "en": "AI labels",
+            "fr": "Étiquettes de l'IA",
+            "de": "KI-Bezeichnungen",
+            "es": "Etiquetas de la IA"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "set_profile",
+      "label": {
+        "en": "Change the Blue Iris profile",
+        "fr": "Changer le profil Blue Iris",
+        "de": "Blue-Iris-Profil wechseln",
+        "es": "Cambiar el perfil de Blue Iris"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Switches Blue Iris to a profile, by name or number. A disarmed profile only if allowed in the configuration.",
+        "fr": "Passe Blue Iris sur un profil, par nom ou numéro. Un profil désarmé seulement si la configuration l'autorise.",
+        "de": "Schaltet Blue Iris auf ein Profil, per Name oder Nummer. Ein unscharfes Profil nur, wenn die Konfiguration es erlaubt.",
+        "es": "Cambia Blue Iris a un perfil, por nombre o número. Un perfil desarmado solo si la configuración lo permite."
+      },
+      "timeout_seconds": 20,
       "fields": [
         {
-          "key": "device",
+          "key": "profile",
+          "type": "string",
+          "label": {
+            "en": "Profile (name or number)",
+            "fr": "Profil (nom ou numéro)",
+            "de": "Profil (Name oder Nummer)",
+            "es": "Perfil (nombre o número)"
+          },
+          "placeholder": {
+            "en": "e.g. Away",
+            "fr": "ex. Absent",
+            "de": "z. B. Abwesend",
+            "es": "p. ej. Ausente"
+          },
+          "required": true,
+          "default": "1"
+        }
+      ]
+    },
+    {
+      "key": "set_signal",
+      "label": {
+        "en": "Arm or disarm Blue Iris",
+        "fr": "Armer ou désarmer Blue Iris",
+        "de": "Blue Iris scharf oder unscharf schalten",
+        "es": "Armar o desarmar Blue Iris"
+      },
+      "description": {
+        "en": "Sets the shield of Blue Iris: green arms, red disarms (only if allowed in the configuration).",
+        "fr": "Règle le bouclier de Blue Iris : vert arme, rouge désarme (seulement si la configuration l'autorise).",
+        "de": "Stellt das Schutzschild von Blue Iris: Grün schaltet scharf, Rot unscharf (nur wenn die Konfiguration es erlaubt).",
+        "es": "Ajusta el escudo de Blue Iris: verde arma, rojo desarma (solo si la configuración lo permite)."
+      },
+      "timeout_seconds": 20,
+      "fields": [
+        {
+          "key": "signal",
+          "type": "select",
+          "label": {
+            "en": "Signal",
+            "fr": "Signal",
+            "de": "Signal",
+            "es": "Señal"
+          },
+          "required": true,
+          "default": "green",
+          "options": [
+            {
+              "value": "green",
+              "label": {
+                "en": "Armed (green)",
+                "fr": "Armé (vert)",
+                "de": "Scharf (grün)",
+                "es": "Armado (verde)"
+              }
+            },
+            {
+              "value": "red",
+              "label": {
+                "en": "Disarmed (red)",
+                "fr": "Désarmé (rouge)",
+                "de": "Unscharf (rot)",
+                "es": "Desarmado (rojo)"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "trigger_camera",
+      "label": {
+        "en": "Trigger a Blue Iris camera",
+        "fr": "Déclencher une caméra Blue Iris",
+        "de": "Blue-Iris-Kamera auslösen",
+        "es": "Activar una cámara Blue Iris"
+      },
+      "description": {
+        "en": "Triggers the camera as its \"Trigger now\" button: recording and alerts per its settings in Blue Iris.",
+        "fr": "Déclenche la caméra comme son bouton « Déclencher » : enregistrement et alertes selon ses réglages dans Blue Iris.",
+        "de": "Löst die Kamera wie ihre Taste „Jetzt auslösen“ aus: Aufnahme und Alarme nach ihren Einstellungen in Blue Iris.",
+        "es": "Activa la cámara como su botón «Activar ahora»: grabación y alertas según sus ajustes en Blue Iris."
+      },
+      "timeout_seconds": 20,
+      "fields": [
+        {
+          "key": "camera",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
+          "label": {
+            "en": "Camera",
+            "fr": "Caméra",
+            "de": "Kamera",
+            "es": "Cámara"
+          },
           "required": true
         }
-      ],
-      "outputs": [
+      ]
+    },
+    {
+      "key": "refresh_snapshot",
+      "label": {
+        "en": "Refresh a camera image",
+        "fr": "Rafraîchir l'image d'une caméra",
+        "de": "Kamerabild aktualisieren",
+        "es": "Actualizar la imagen de una cámara"
+      },
+      "description": {
+        "en": "Takes a fresh image of the camera for Gladys, to send it in a message right after.",
+        "fr": "Prend une image neuve de la caméra pour Gladys, à envoyer ensuite dans un message.",
+        "de": "Nimmt ein neues Bild der Kamera für Gladys auf, um es danach in einer Nachricht zu senden.",
+        "es": "Toma una imagen nueva de la cámara para Gladys, para enviarla después en un mensaje."
+      },
+      "timeout_seconds": 30,
+      "fields": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "camera",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Camera",
+            "fr": "Caméra",
+            "de": "Kamera",
+            "es": "Cámara"
+          },
+          "required": true
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "blue_iris",
+      "label": {
+        "en": "Blue Iris",
+        "fr": "Blue Iris",
+        "de": "Blue Iris",
+        "es": "Blue Iris"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Profile, armed or not, cameras online and the last alerts with their image.",
+        "fr": "Profil, armement, caméras en ligne et dernières alertes avec leur image.",
+        "de": "Profil, Scharfschaltung, Kameras online und letzte Alarme mit ihrem Bild.",
+        "es": "Perfil, armado, cámaras en línea y últimas alertas con su imagen."
+      },
+      "icon": "shield",
+      "action_timeout_seconds": 20,
+      "settings": [
+        {
+          "key": "camera",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Camera (empty: all)",
+            "fr": "Caméra (vide : toutes)",
+            "de": "Kamera (leer: alle)",
+            "es": "Cámara (vacío: todas)"
+          }
+        }
+      ]
     }
   ]
 }

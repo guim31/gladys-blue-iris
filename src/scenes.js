@@ -1,41 +1,39 @@
 // -----------------------------------------------------------------------------
-// Scene actions (SDK v0.14+, Gladys 5.1+).
+// Scene action handlers (manifest `scene_actions`, Gladys 5.1+).
 //
-// A scene action is an OPERATION a scene author places in a scene, with
-// parameters and a result: "identify this device", "take a snapshot", "clean
-// these rooms". Each one is declared in the manifest `scene_actions` field
-// (key, label, `fields` in the config_schema grammar, scalar `outputs`) and
-// handled here, keyed by that same `key`; index.js registers every entry with
-// `gladys.onSceneAction(key, ...)`.
-//
-// Scene TRIGGERS are the other direction ("this happened"): they are fired by
-// the device that observes the event, see src/devices/motionSensor.js.
-//
-// The rules that matter:
-//   - `fields` arrive RESOLVED: scene variables substituted, defaults applied,
-//     validated by the core; a `"source": "devices"` field is the chosen
-//     device external_id;
-//   - resolve an object of the declared `outputs` (scalars only), readable by
-//     the following actions of the scene, or `undefined` for none. Keys not
-//     declared in the manifest are dropped by the core;
-//   - throwing fails THIS action only: the scene logs it and continues. A
-//     scene action is never a condition: return an output and let the scene
-//     author gate on it;
-//   - never fire a scene event as a consequence of a received action: a scene
-//     bound to that event would loop through the integration.
+//   - set_profile: switch Blue Iris to a profile, by number or name ("Away"
+//     when the house alarm is armed). Profile 0 "Inactive" and the profiles
+//     listed as disarmed in the configuration only once disarming is allowed;
+//   - set_signal: arm (green) or disarm (red, same rule) the shield;
+//   - trigger_camera: trigger a camera as its "trigger now" button does
+//     (recording and alerts per the camera's settings in Blue Iris);
+//   - refresh_snapshot: a fresh image of a camera, sent to Gladys, so the next
+//     action ("send the camera image" in a message) sends what it sees now.
+// Gladys applies the field defaults to scene actions; a failure throws, the
+// scene logs it and carries on. No action fires a scene event (no loop).
 // -----------------------------------------------------------------------------
 
-import { createLogger } from '@gladysassistant/integration-sdk';
-import { signalDevice } from './devices/index.js';
+import { SIGNALS } from './blueiris/model.js';
 
-const logger = createLogger({ name: 'scenes' });
+// Choices of the set_signal field (yellow is a transition of Blue Iris).
+export const SCENE_SIGNALS = Object.freeze([SIGNALS.GREEN, SIGNALS.RED]);
+export const DEFAULT_SCENE_SIGNAL = SIGNALS.GREEN;
+export const DEFAULT_SCENE_PROFILE = '1';
 
 export const SCENE_ACTIONS = {
-  // The ack is awaited under the action's `timeout_seconds` (15 s in the
-  // manifest), counted from the moment the scene reaches the action.
-  async identify_device(gladys, { fields, config }) {
-    logger.info(`Scene action identify_device <- ${fields.device}`);
-    const signalled = await signalDevice(gladys, fields.device, config);
-    return { signalled };
+  async set_profile(hub, { fields = {} }) {
+    await hub.setProfile(fields.profile ?? DEFAULT_SCENE_PROFILE);
+  },
+
+  async set_signal(hub, { fields = {} }) {
+    await hub.setSignal(fields.signal ?? DEFAULT_SCENE_SIGNAL);
+  },
+
+  async trigger_camera(hub, { fields = {} }) {
+    await hub.triggerCamera(fields.camera);
+  },
+
+  async refresh_snapshot(hub, { fields = {} }) {
+    await hub.refreshSnapshot(fields.camera);
   },
 };

@@ -28,8 +28,30 @@ Gladys before reporting a problem.
 
 ## Scope
 
-In scope: the code of this repository and the Docker image it publishes.
+In scope: the code of this repository and the Docker image it publishes. In
+particular:
+
+- **Secrets**: the password of the Blue Iris user lives in the Gladys
+  configuration of the integration (a `secret` field). It is used only to
+  answer the login challenge of the configured server
+  (`md5("user:session:password")`: the password itself never travels), and is
+  never written to the logs, to `/data` or to an error message. The session id
+  Blue Iris returns is kept in memory only and never logged. An address typed
+  with credentials (`user:pass@host`) is refused. A password refused once is
+  never tried again without the user, so Blue Iris does not ban Gladys.
+- **`/data`**: the only file is `blue-iris-state.json`: the system name, the
+  version, the profile names and the rights of the user, the cameras (short
+  name, name, PTZ presets, AI detections seen). No secret, no image.
+- **Network**: the integration talks only to the configured server (HTTP, or
+  HTTPS when asked; Blue Iris on a LAN only has a self-signed certificate,
+  which is then accepted without check), never to a cloud.
+- **Safety**: disarming (red signal, profile 0 "Inactive", the profiles listed
+  as disarmed) is disabled by default and is never a switch; a PTZ move is
+  bounded by a watchdog.
+- **Camera images** stay in memory (the last ones, for the widget) and go to
+  Gladys only.
 
 Out of scope: Gladys Assistant itself (see its
 [security policy](https://github.com/GladysAssistant/Gladys/security/policy)),
-and the third-party services and devices the integration talks to.
+and Blue Iris and the cameras (report those to Perspective Software and the
+camera makers).

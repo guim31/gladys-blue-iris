@@ -1,0 +1,41 @@
+[
+  {
+    "camera": "FrontDoor",
+    "path": "@83912001.bvr",
+    "offset": 4200,
+    "flags": 335675392,
+    "res": "2688x1520",
+    "zones": 1,
+    "date": 1792076400,
+    "color": 8151097,
+    "filesize": "9 sec",
+    "clip": "@83911876.bvr",
+    "memo": "person:89%"
+  },
+  {
+    "camera": "Garden",
+    "path": "@83910422.bvr",
+    "offset": 1200,
+    "flags": 268566528,
+    "res": "2688x1520",
+    "zones": 3,
+    "date": 1792069200,
+    "color": 3355647,
+    "filesize": "6 sec",
+    "clip": "@83910400.bvr",
+    "memo": "cat:71%"
+  },
+  {
+    "camera": "FrontDoor",
+    "path": "@83905555.bvr",
+    "offset": 800,
+    "flags": 8519680,
+    "res": "2688x1520",
+    "zones": 1,
+    "date": 1792065600,
+    "color": 8151097,
+    "filesize": "4 sec",
+    "clip": "@83905500.bvr",
+    "memo": "nothing found"
+  }
+]

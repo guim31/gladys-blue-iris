@@ -1,0 +1,178 @@
+# Blue Iris
+
+## Presentación
+
+Esta integración conecta Gladys con **Blue Iris**, el software de videovigilancia para Windows,
+mediante su interfaz JSON local (la de su propia interfaz web). Nada pasa por una nube.
+
+- un dispositivo por cámara: su imagen, si está en línea, ve movimiento o está activada, y la persona
+  o el vehículo confirmados por la IA de Blue Iris si usted utiliza una;
+- un dispositivo servidor Blue Iris: perfil activo, señal de armado (verde, amarillo, rojo), carga de
+  CPU y almacenamiento de las grabaciones;
+- órdenes: cambiar de perfil, armar, activar una cámara, mover una cámara PTZ o llevarla a una
+  posición guardada. El desarmado está desactivado por defecto, como en una alarma;
+- un disparador de escena «Alerta en una cámara Blue Iris», con lo que se vio, y un widget del panel.
+
+> **Developed without the hardware: feedback welcome.** Esta integración se escribió a partir de la
+> documentación de la interfaz JSON de Blue Iris y de otras integraciones, sin un servidor Blue Iris
+> a mano. Indique lo que funciona y lo que no en las
+> [issues](https://github.com/guim31/gladys-blue-iris/issues).
+
+Esta integración no está afiliada a Perspective Software, el editor de Blue Iris.
+
+## Requisitos
+
+- Blue Iris 5 o posterior, con su **servidor web** activo (Ajustes → Servidor web), accesible desde
+  Gladys (puerto 81 por defecto).
+- Un **usuario de Blue Iris dedicado** a Gladys (Ajustes → Usuarios), con contraseña:
+  - un usuario normal (no administrador) basta para leer las cámaras, el perfil y las alertas;
+  - permítale **cambiar de perfil** para armar y cambiar de perfil desde Gladys;
+  - permítale el **PTZ** para mover las cámaras;
+  - activar una cámara requiere un **administrador** en Blue Iris.
+- Si el servidor web limita el acceso («Non-LAN only», bloqueo automático), la dirección de Gladys
+  está en la red local: nada que cambiar. Blue Iris puede bloquear una dirección tras varias
+  contraseñas erróneas; la integración se detiene al primer rechazo.
+
+## Configuración
+
+En Gladys, **Integraciones → Blue Iris → Configuración**:
+
+| Ajuste                                 | Función                                                                                                                                            |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dirección del servidor**             | Dirección IP o nombre del PC Windows que ejecuta Blue Iris, p. ej. `192.168.1.20`.                                                                 |
+| **Puerto del servidor web**            | 81, salvo si lo cambió en Blue Iris. Un puerto escrito en la dirección tiene prioridad.                                                            |
+| **HTTPS**                              | Solo si el servidor web de Blue Iris sirve HTTPS en este puerto. Su certificado no se comprueba.                                                   |
+| **Nombre de usuario** / **Contraseña** | El usuario de Blue Iris dedicado. La contraseña solo se envía a Blue Iris.                                                                         |
+| **Actualización**                      | Frecuencia de lectura de Blue Iris (5 s a 1 min, 10 s por defecto): movimientos, activaciones y alertas se ven a este ritmo.                       |
+| **Imágenes de las cámaras**            | Frecuencia de actualización de la imagen de las cámaras añadidas (o «Solo con alertas»). Una alerta siempre envía una nueva.                       |
+| **Mantener el perfil elegido**         | Activado (por defecto): un perfil elegido desde Gladys se mantiene, el horario de Blue Iris ya no lo cambia. Desactivado: hasta su próximo cambio. |
+| **Permitir desarmar desde Gladys**     | Desactivado por defecto. Vea más abajo.                                                                                                            |
+| **Otros perfiles desarmados**          | Perfiles en los que sus cámaras no vigilan (p. ej. `Casa`), por nombre o número, separados por comas.                                              |
+| **Idioma de los nombres**              | Idioma de los nombres de funciones y de los textos enviados a las escenas. Se fijan al añadir un dispositivo.                                      |
+
+Luego **Probar la conexión**: el informe indica el servidor, el número de cámaras, el perfil activo y
+los derechos del usuario. Abra la pestaña **Descubrir** y añada el servidor y las cámaras que desee.
+
+**Armado y desarmado.** El armado (señal verde, cualquier perfil que vigile) siempre está permitido.
+El desarmado — la señal roja, el perfil 0 «Inactive» (en el que las cámaras de Blue Iris no se
+activan) o un perfil indicado en **Otros perfiles desarmados** — se rechaza mientras no active
+**Permitir desarmar desde Gladys**: un desarmado enviado por error deja las cámaras ciegas. El
+desarmado nunca es un interruptor: ni un asistente de voz ni un botón del panel puede hacerlo por
+accidente.
+
+## Dispositivos
+
+### Servidor Blue Iris
+
+| Función                  | Significado                                                                                                           |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| **En línea**             | Blue Iris responde.                                                                                                   |
+| **Perfil**               | El perfil activo (0 a 7, con los nombres de Blue Iris). Una orden: elija otro.                                        |
+| **Señal de armado**      | **Armado (verde)**, **Armando (amarillo)** o **Desarmado (rojo)**. Una orden: verde arma, rojo desarma si se permite. |
+| **Carga de CPU**         | Carga de CPU del servidor, en %.                                                                                      |
+| **Almacenamiento usado** | Ocupación del almacenamiento de grabaciones de Blue Iris, en %.                                                       |
+| **Espacio libre**        | Espacio libre de los discos de grabación, en GB.                                                                      |
+
+Perfil y señal son de solo lectura para un usuario que no puede cambiar de perfil.
+
+### Cámaras
+
+Un dispositivo por cámara de Blue Iris (se omiten los grupos y la vista «todas las cámaras»), con el
+nombre de Blue Iris:
+
+| Función               | Significado                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Imagen**            | La imagen de la cámara, en el cuadro de cámara del panel.                                                         |
+| **En línea**          | La cámara está activada y recibe vídeo.                                                                           |
+| **Movimiento**        | Blue Iris ve movimiento.                                                                                          |
+| **Activada**          | La cámara está activada (grabación, alertas según sus ajustes).                                                   |
+| **Persona**           | Una alerta confirmó una persona (IA). Aparece en cuanto Blue Iris haya señalado una.                              |
+| **Vehículo**          | Una alerta confirmó un vehículo (IA). Aparece en cuanto Blue Iris haya señalado uno.                              |
+| **Orientación (PTZ)** | Cámaras PTZ: las flechas y el zoom del cuadro de cámara del panel. Un movimiento se detiene solo tras 2 segundos. |
+| **Posición guardada** | Cámaras PTZ con posiciones: ir a una posición guardada en Blue Iris.                                              |
+
+**Persona** y **Vehículo** permanecen activos al menos 30 segundos tras la alerta, y luego mientras la
+cámara esté activada. Aparecen en la pestaña Descubrir («Actualizar») la primera vez que la IA de
+Blue Iris señala uno; para ello se leen al inicio las alertas de las últimas 24 horas. Las etiquetas
+de la IA (CodeProject.AI, DeepStack…) se leen en el memo de la alerta: `person`, `car`, `truck`,
+`bus`, `motorcycle`, `bicycle`…
+
+## Widget del panel
+
+El widget **Blue Iris** muestra, para todas las cámaras o la elegida en sus ajustes:
+
+- el perfil activo, **Armada** / **Armando** / **Desarmada**, las cámaras en línea y las alertas de 24
+  horas;
+- las últimas alertas con lo que se vio y la imagen tomada en ese momento;
+- un botón **Armar** mientras no esté armada; **Desarmar** solo si se permite en la configuración,
+  con confirmación; **Activar** para la cámara elegida.
+
+## Disparador de escena
+
+**Alerta en una cámara Blue Iris**: Blue Iris generó una alerta en una cámara. Filtros: la cámara y
+**Qué se vio**: Persona, Vehículo, Animal, Movimiento, Sonido, Activación externa, Otra alerta (lo más
+significativo primero: una alerta con una persona y movimiento es «Persona»). La imagen de la cámara
+está al día cuando empieza la escena. Variables: **Nombre de la cámara**, **Qué se vio**,
+**Etiquetas de la IA** (el memo de Blue Iris, p. ej. `person:87%`).
+
+Solo las alertas que Blue Iris conserva (no las que su IA canceló) inician una escena, un evento por
+alerta. Si el usuario no puede leer las alertas, una alerta se ve igualmente (como «Otra alerta») a
+partir de la hora de la última alerta de la cámara.
+
+## Acciones de escena
+
+- **Cambiar el perfil de Blue Iris**: por nombre (`Away`) o número (`1`). Un perfil desarmado solo si
+  se permite.
+- **Armar o desarmar Blue Iris**: verde arma; rojo desarma solo si se permite.
+- **Activar una cámara Blue Iris**: como su botón «Activar ahora» (administrador en Blue Iris).
+- **Actualizar la imagen de una cámara**: toma una imagen nueva para Gladys, para enviarla después en
+  un mensaje.
+
+## Ejemplos de escenas
+
+- **Al salir de casa**: cuando la alarma de la casa está armada → **Cambiar el perfil de Blue Iris** a
+  `Away`.
+- **Alguien en la puerta de noche**: **Alerta en una cámara Blue Iris**, cámara «Entrada», Qué se vio
+  = Persona, entre las 22:00 y las 6:00 → encender la luz de la entrada y enviar la imagen de la
+  cámara en un mensaje de Telegram.
+- **Vigilar el portón**: un sensor de apertura se abre → **Activar una cámara Blue Iris** «Portón» y
+  llevar la cámara PTZ a su posición guardada «Portón».
+
+## Actualización y carga
+
+Blue Iris es un servidor local sin cuota: la integración lee `status` y `camlist` al ritmo de la
+**Actualización** (dos peticiones pequeñas), y la lista de alertas solo para una cámara con una
+alerta nueva. Como mucho hay dos peticiones en curso. Las imágenes se piden reducidas por Blue Iris
+(1280 px, luego más pequeñas si la imagen supera los 150 KB que acepta Gladys): nada se decodifica en
+el contenedor. Un valor sin cambios se reenvía cada 6 horas, para que el panel nunca muestre «sin
+valor reciente».
+
+## Solución de problemas
+
+- **«Blue Iris no responde»**: compruebe la dirección, el puerto, que el servidor web de Blue Iris
+  esté activo y que el cortafuegos de Windows deje pasar a Gladys.
+- **«Contraseña rechazada: detenido para que Blue Iris no bloquee a Gladys»**: corrija el nombre de
+  usuario o la contraseña y luego **Probar la conexión** (un intento más). Compruebe en Blue Iris que
+  la dirección de Gladys no esté bloqueada.
+- **«No hay interfaz JSON de Blue Iris en esta dirección»**: puerto incorrecto, u otro servidor web
+  responde.
+- **«Este usuario de Blue Iris no tiene ese permiso»**: concédale el derecho en Blue Iris (cambiar de
+  perfil, PTZ, administrador para activar).
+- **Desarmado rechazado**: es intencionado, vea «Armado y desarmado».
+- **Ninguna función Persona / Vehículo**: la IA de Blue Iris aún no ha señalado ninguno; aparece en
+  Descubrir («Actualizar») con el primero.
+- Para más detalle, ajuste `LOG_LEVEL=debug` en la integración: cada alerta y cada lectura quedan
+  registradas.
+
+## Límites
+
+- Un solo servidor Blue Iris por integración.
+- Sin flujo de vídeo en directo (Gladys muestra imágenes), sin reproducción de grabaciones, sin
+  salidas DIO, sin cambio de horario.
+- Movimientos y alertas se ven al ritmo de la actualización (10 s por defecto), no al instante: Blue
+  Iris envía sus eventos por MQTT o llamadas web, que la sandbox de Gladys no puede recibir aquí.
+- El amarillo es una transición de Blue Iris (retardo de armado): se muestra, nunca se envía.
+- Los nombres de las funciones se fijan al añadir un dispositivo; los grupos de cámaras no son
+  dispositivos.
+- Desarrollada sin el hardware: sus comentarios son bienvenidos (Developed without the hardware:
+  feedback welcome).
