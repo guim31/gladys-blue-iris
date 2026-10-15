@@ -1,0 +1,33 @@
+{
+  "auth": "user",
+  "system name": "BLUEIRIS-PC",
+  "admin": false,
+  "changeprofile": true,
+  "ptz": true,
+  "audio": true,
+  "clips": true,
+  "clipcreate": false,
+  "streamtimelimit": false,
+  "dio": false,
+  "version": "5.9.9.33",
+  "license": "(redacted)",
+  "support": "",
+  "user": "gladys",
+  "latitude": 0,
+  "longitude": 0,
+  "tzone": -120,
+  "lan": true,
+  "streams": ["Stream 0", "Stream 1", "Stream 2"],
+  "sounds": ["alarm.wav", "chime.wav"],
+  "profiles": [
+    "Inactive",
+    "Away",
+    "Home",
+    "Night",
+    "Vacation",
+    "Profile 5",
+    "Profile 6",
+    "Profile 7"
+  ],
+  "schedules": ["Default", "Weekend"]
+}

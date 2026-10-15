@@ -1,0 +1,9 @@
+{
+  "brightness": -1,
+  "contrast": 0,
+  "irmode": 0,
+  "powermode": -1,
+  "presetnum": 15,
+  "presets": ["Driveway", "Gate", "", "(undefined)", "Preset 5"],
+  "talksamplerate": 8000
+}

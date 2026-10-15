@@ -1,169 +1,218 @@
 // -----------------------------------------------------------------------------
-// Dashboard widgets (SDK v0.14+, Gladys 5.1+).
+// Dashboard widget (manifest `widgets`, Gladys 5.1+): `blue_iris`.
 //
-// A widget puts the integration's own data on the Gladys dashboard without a
-// dedicated core widget. The manifest `widgets` field declares its identity
-// (key, label, icon, optional per-instance `settings`); at runtime the
-// integration returns a DECLARATIVE content — `text`, `value`, `gauge`,
-// `status`, `chart`, `card-list`, `image`, `button` — that the core renders
-// with its own theme, dark mode and translations. No HTML, no CSS.
+// The use case: a glance at the wall tablet — "is the surveillance armed, in
+// which profile, what happened today?" — and arming it on the way out. So the
+// widget shows:
+//   - tiles: the active profile, the shield (armed, arming, disarmed), the
+//     cameras online (5/6) and the alerts over 24 hours;
+//   - the last alerts, newest first, with what was seen and the image taken
+//     when it happened (card-list, list display, its date under the title);
+//   - buttons: "Arm" while not armed; "Disarm" only when the configuration
+//     allows it, with a confirmation; "Trigger" for the camera chosen in the
+//     widget settings. A user who may not change profiles sees no arm button.
+// Every camera by default, or the one chosen in the widget settings.
 //
-// Each entry of WIDGETS is keyed by the widget `key` and exposes:
-//   - get(gladys, { settings, language, units, config }): the content,
-//     registered by index.js with `gladys.onWidgetGet(key, ...)`;
-//   - action(gladys, { actionKey, params, settings, config }) (optional): a
-//     tapped `button` carrying an `action`, registered with
-//     `gladys.onWidgetAction`.
-//
-// Check your contents in the tests with `validateWidgetContent` (exported by
-// the SDK, see test/widgets.test.js), or run with DEBUG=gladys-integration-sdk
-// to have the SDK log every violation of the vocabulary and the budget.
+// Budget (8 components, ≤ 2 texts, one focal component, ≤ 4 buttons): four
+// tiles, one card-list or one caption, three buttons at most. Button action
+// keys are unique (the core drops a duplicate). The alerts are kept in
+// memory: after a restart the list holds the last 24 hours without images.
+// Images: keys `al-<id>`, immutable, served by onWidgetGetImage from the hub.
 // -----------------------------------------------------------------------------
 
-import {
-  createLogger,
-  DEVICE_FEATURE_CATEGORIES,
-  DEVICE_TRANSPORTS,
-  WIDGET_COLORS,
-} from '@gladysassistant/integration-sdk';
-import { identifyDevice } from './devices/index.js';
-import { weatherStation } from './devices/weatherStation.js';
-import { plug } from './devices/plug.js';
-import { light } from './devices/light.js';
+import { WIDGET_COLORS } from '@gladysassistant/integration-sdk';
+import { ERROR_KINDS } from './blueiris/client.js';
+import { SIGNALS } from './blueiris/model.js';
+import { WIDGET_KEY } from './hub.js';
+import { ACTION_TEXT, DETECTION_NAMES, ERROR_TEXT, pick } from './texts.js';
 
-const logger = createLogger({ name: 'widgets' });
+export const WIDGET_ACTIONS = Object.freeze({ ARM: 'arm', DISARM: 'disarm', TRIGGER: 'trigger' });
 
-// Widget key, as declared in the manifest `widgets` field.
-export const DEMO_STATUS_WIDGET = 'demo_status';
-
-// Keys of the `button` actions the demo_status content declares.
-const DEMO_STATUS_ACTIONS = { IDENTIFY_LIGHT: 'identify_light' };
-
-// How the plug transport reads in the status list.
-const TRANSPORT_STATUS = {
-  [DEVICE_TRANSPORTS.LOCAL]: { value: { en: 'Local', fr: 'Locale' }, color: WIDGET_COLORS.SUCCESS },
-  [DEVICE_TRANSPORTS.CLOUD]: { value: { en: 'Cloud', fr: 'Cloud' }, color: WIDGET_COLORS.INFO },
-  [DEVICE_TRANSPORTS.UNREACHABLE]: {
-    value: { en: 'Unreachable', fr: 'Injoignable' },
-    color: WIDGET_COLORS.DANGER,
+export const TEXT = {
+  configure: {
+    en: 'Enter the address, user name and password of Blue Iris in the configuration of the integration.',
+    fr: "Saisissez l'adresse, le nom d'utilisateur et le mot de passe de Blue Iris dans la configuration de l'intégration.",
+    de: 'Gib Adresse, Benutzername und Passwort von Blue Iris in der Konfiguration der Integration ein.',
+    es: 'Introduzca la dirección, el nombre de usuario y la contraseña de Blue Iris en la configuración de la integración.',
   },
+  unknown: {
+    en: 'This camera is no longer in Blue Iris: choose another one in the widget settings.',
+    fr: "Cette caméra n'est plus dans Blue Iris : choisissez-en une autre dans les réglages du widget.",
+    de: 'Diese Kamera ist nicht mehr in Blue Iris: Wähle eine andere in den Widget-Einstellungen.',
+    es: 'Esta cámara ya no está en Blue Iris: elija otra en la configuración del widget.',
+  },
+  noAlert: {
+    en: 'No alert in the last 24 hours.',
+    fr: 'Aucune alerte depuis 24 heures.',
+    de: 'Kein Alarm in den letzten 24 Stunden.',
+    es: 'Ninguna alerta en las últimas 24 horas.',
+  },
+  profile: { en: 'Profile', fr: 'Profil', de: 'Profil', es: 'Perfil' },
+  shield: { en: 'Surveillance', fr: 'Surveillance', de: 'Überwachung', es: 'Vigilancia' },
+  armed: { en: 'Armed', fr: 'Armée', de: 'Scharf', es: 'Armada' },
+  arming: { en: 'Arming', fr: 'Armement', de: 'Wird scharf', es: 'Armando' },
+  disarmed: { en: 'Disarmed', fr: 'Désarmée', de: 'Unscharf', es: 'Desarmada' },
+  online: {
+    en: 'Cameras online',
+    fr: 'Caméras en ligne',
+    de: 'Kameras online',
+    es: 'Cámaras en línea',
+  },
+  alerts: { en: 'Alerts 24 h', fr: 'Alertes 24 h', de: 'Alarme 24 h', es: 'Alertas 24 h' },
+  arm: { en: 'Arm', fr: 'Armer', de: 'Scharf schalten', es: 'Armar' },
+  disarm: { en: 'Disarm', fr: 'Désarmer', de: 'Unscharf', es: 'Desarmar' },
+  trigger: { en: 'Trigger', fr: 'Déclencher', de: 'Auslösen', es: 'Activar' },
 };
 
-// A live tile references a feature by its external_id: read it from the
-// discovery payload itself, so the widget and the device never disagree.
-function featureExternalId(gladys, config, blueprint, category) {
-  const device = blueprint.buildDevice(gladys, config);
-  return device.features.find((feature) => feature.category === category).external_id;
+const t = (text, language) => pick(text, language);
+const fit = (text, max) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+
+function message(text, language) {
+  return {
+    ttl_seconds: 300,
+    components: [{ type: 'text', variant: 'body', text: t(text, language) }],
+  };
 }
 
-function plugConnectionStatus(gladys, config) {
-  const { transport, degraded } = plug.transport(gladys, config);
-  const { value, color } = TRANSPORT_STATUS[transport];
-  if (degraded) {
-    return {
-      value: { en: `${value.en} (degraded mode)`, fr: `${value.fr} (mode dégradé)` },
-      color: WIDGET_COLORS.WARNING,
-    };
+const SHIELD = {
+  [SIGNALS.GREEN]: { text: TEXT.armed, color: WIDGET_COLORS.SUCCESS, icon: 'shield' },
+  [SIGNALS.YELLOW]: { text: TEXT.arming, color: WIDGET_COLORS.WARNING, icon: 'shield' },
+  [SIGNALS.RED]: { text: TEXT.disarmed, color: WIDGET_COLORS.DANGER, icon: 'shield-off' },
+};
+
+/** "Person · Front door" — what was seen, and where. */
+export function alertTitle(alert, cameraName, language) {
+  const what = pick(DETECTION_NAMES, language)[alert.kind] ?? pick(DETECTION_NAMES, language).other;
+  return fit(`${what} · ${cameraName}`, 60);
+}
+
+async function get(hub, { settings, language = 'en' }) {
+  const view = hub.view();
+  if (!view.configured) {
+    return message(TEXT.configure, language);
   }
-  return { value, color };
+  let shown = view.cameras;
+  let chosen = null;
+  if (settings?.camera) {
+    chosen = view.cameras.find((camera) => camera.externalId === settings.camera);
+    if (!chosen) {
+      return message(TEXT.unknown, language);
+    }
+    shown = [chosen];
+  }
+  const components = [];
+  if (!view.online) {
+    const kind = view.error?.kind === ERROR_KINDS.AUTH ? ERROR_KINDS.BLOCKED : view.error?.kind;
+    components.push({
+      type: 'text',
+      variant: 'caption',
+      text: fit(t(ERROR_TEXT[kind] ?? ERROR_TEXT[ERROR_KINDS.UNREACHABLE], language), 80),
+    });
+  }
+
+  const status = view.online ? view.status : null;
+  if (status?.profile !== null && status?.profile !== undefined) {
+    components.push({
+      type: 'value',
+      value: fit(view.profileName(status.profile, language), 12),
+      label: t(TEXT.profile, language),
+      icon: 'layers',
+    });
+  }
+  const shield = SHIELD[status?.signal];
+  if (shield) {
+    components.push({
+      type: 'value',
+      value: fit(t(shield.text, language), 12),
+      label: t(TEXT.shield, language),
+      icon: shield.icon,
+      color: shield.color,
+    });
+  }
+  const onlineCount = shown.filter((camera) => camera.online).length;
+  components.push(
+    {
+      type: 'value',
+      value: `${onlineCount}/${shown.length}`,
+      label: t(TEXT.online, language),
+      icon: 'video',
+      color: onlineCount === shown.length ? WIDGET_COLORS.SUCCESS : WIDGET_COLORS.DANGER,
+    },
+    {
+      type: 'value',
+      value: view.alertsToday(chosen?.short),
+      label: t(TEXT.alerts, language),
+      icon: 'bell',
+    },
+  );
+
+  const names = new Map(view.cameras.map((camera) => [camera.short, camera.name]));
+  const alerts = view.alerts
+    .filter((alert) => !chosen || alert.short === chosen.short)
+    .filter((alert) => names.has(alert.short));
+  if (alerts.length > 0) {
+    components.push({
+      type: 'card-list',
+      display: 'list',
+      items: alerts.slice(0, 8).map((alert) => ({
+        title: alertTitle(alert, names.get(alert.short), language),
+        date: new Date(alert.at).toISOString(),
+        ...(alert.imageKey ? { image: alert.imageKey } : {}),
+      })),
+    });
+  } else if (view.online) {
+    components.push({ type: 'text', variant: 'caption', text: t(TEXT.noAlert, language) });
+  }
+
+  if (view.online && view.rights.changeProfile) {
+    if (status?.signal !== SIGNALS.GREEN) {
+      components.push({
+        type: 'button',
+        label: t(TEXT.arm, language),
+        icon: 'shield',
+        style: 'primary',
+        action: { key: WIDGET_ACTIONS.ARM },
+      });
+    } else if (view.allowDisarm) {
+      components.push({
+        type: 'button',
+        label: t(TEXT.disarm, language),
+        icon: 'shield-off',
+        style: 'danger',
+        action: { key: WIDGET_ACTIONS.DISARM, confirm: true },
+      });
+    }
+  }
+  if (view.online && chosen) {
+    components.push({
+      type: 'button',
+      label: t(TEXT.trigger, language),
+      icon: 'zap',
+      style: 'secondary',
+      action: { key: WIDGET_ACTIONS.TRIGGER, params: { camera: chosen.externalId } },
+    });
+  }
+  // Alerts and commands nudge the widget (requestWidgetRefresh); the TTL is a net.
+  return { ttl_seconds: 60, components };
+}
+
+/** A widget button: arm, disarm (only when allowed), trigger a camera. */
+async function action(hub, { actionKey, params = {} }) {
+  switch (actionKey) {
+    case WIDGET_ACTIONS.ARM:
+      await hub.setSignal(SIGNALS.GREEN);
+      return ACTION_TEXT.armed;
+    case WIDGET_ACTIONS.DISARM:
+      await hub.setSignal(SIGNALS.RED);
+      return ACTION_TEXT.disarmed;
+    case WIDGET_ACTIONS.TRIGGER:
+      await hub.triggerCamera(params.camera);
+      return ACTION_TEXT.triggered;
+    default:
+      throw new Error(`Unknown widget action ${actionKey}`);
+  }
 }
 
 export const WIDGETS = {
-  [DEMO_STATUS_WIDGET]: {
-    // `settings` holds the per-instance values of the declared `settings`
-    // (none here); `language` and `units` are those of the user viewing the
-    // dashboard, for the values you format yourself. Multi-language objects
-    // (`{ en, fr }`) are picked by the core, like everywhere else.
-    async get(gladys, { config }) {
-      logger.debug(`onWidgetGet <- ${DEMO_STATUS_WIDGET}`);
-      return {
-        // Reload policy: the computed parts below only change with the
-        // config, and index.js nudges the widget on every (re)connection and
-        // config update (see refreshWidgets) — the TTL is just a safety net.
-        ttl_seconds: 300,
-        components: [
-          // Device-bound tiles: LIVE, they follow the published states over
-          // the core's real-time path. No TTL, no nudge involved.
-          {
-            type: 'value',
-            label: { en: 'Temperature', fr: 'Température' },
-            icon: 'thermometer',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              weatherStation,
-              DEVICE_FEATURE_CATEGORIES.TEMPERATURE_SENSOR,
-            ),
-          },
-          {
-            type: 'value',
-            label: { en: 'Office plug', fr: 'Prise du bureau' },
-            icon: 'zap',
-            device_feature: featureExternalId(
-              gladys,
-              config,
-              plug,
-              DEVICE_FEATURE_CATEGORIES.ENERGY_SENSOR,
-            ),
-          },
-          // Computed rows: what the integration knows that no device feature
-          // carries. Served from the core cache until the TTL or a nudge.
-          {
-            type: 'status',
-            items: [
-              {
-                label: { en: 'Plug connection', fr: 'Connexion de la prise' },
-                icon: 'wifi',
-                ...plugConnectionStatus(gladys, config),
-              },
-              {
-                label: { en: 'Observed location', fr: 'Position observée' },
-                icon: 'map-pin',
-                value: `${config.latitude.toFixed(2)}, ${config.longitude.toFixed(2)}`,
-                color: WIDGET_COLORS.NEUTRAL,
-              },
-            ],
-          },
-          // `params` are declared HERE and sent back as-is: the handler never
-          // receives user input (a dashboard can hang on a public wall).
-          {
-            type: 'button',
-            label: { en: 'Identify the light', fr: 'Identifier la lampe' },
-            icon: 'eye',
-            style: 'secondary',
-            action: {
-              key: DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT,
-              params: { device: light.deviceExternalId(gladys) },
-            },
-          },
-        ],
-      };
-    },
-
-    // Resolve an optional toast (string or multi-language object, ≤ 200
-    // characters). After a successful action the core drops the cached
-    // content and every open dashboard refetches it: no nudge needed.
-    async action(gladys, { actionKey, params, config }) {
-      logger.info(`onWidgetAction <- ${DEMO_STATUS_WIDGET}.${actionKey}`);
-      if (actionKey === DEMO_STATUS_ACTIONS.IDENTIFY_LIGHT) {
-        return identifyDevice(gladys, params.device, config);
-      }
-      // Throwing acks the action as failed: the message reaches the user.
-      throw new Error(`Unknown widget action: ${actionKey}`);
-    },
-  },
+  [WIDGET_KEY]: { get, action },
 };
-
-/**
- * Freshness nudge: ask the core to re-pull every widget NOW instead of
- * waiting for the content TTL. Call it when you KNOW a computed content
- * changed (here: the config, which drives the plug transport and the observed
- * location) — and after every (re)connection, since the nudges are
- * fire-and-forget: rate-limited core-side to 1 per 10 s per widget, dropped
- * silently while disconnected.
- */
-export function refreshWidgets(gladys) {
-  for (const key of Object.keys(WIDGETS)) {
-    gladys.requestWidgetRefresh(key);
-  }
-}

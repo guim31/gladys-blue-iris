@@ -1,0 +1,33 @@
+{
+  "signal": "1",
+  "cxns": 3,
+  "cpu": 9,
+  "gpu": 0,
+  "ram": "3418931200",
+  "bits": 28,
+  "mem": "3.18G",
+  "memphys": "31.9G",
+  "memload": "27%",
+  "folders": [],
+  "disks": [
+    {
+      "disk": "D:",
+      "allocated": 1841152,
+      "used": 1563676,
+      "free": 343444,
+      "total": 1907599
+    }
+  ],
+  "profile": 1,
+  "lock": "0",
+  "schedule": "Default",
+  "dio": [false, false],
+  "uptime": "4:20:55:44",
+  "clips": "Clips: 1234 items, 1.49T/1.76T; D: +335.4G",
+  "time": "1792087200000",
+  "tmessage": "1792087199975",
+  "clipprocess": "",
+  "warnings": "4",
+  "alerts": "58",
+  "tzone": "-120"
+}

@@ -31,16 +31,24 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
+index.js                          SDK wiring only: src/app.js registers the handlers before connect()
+src/app.js                        every SDK handler -> the hub (also used by the tests)
+src/hub.js                        the server: timers, states, alerts and their trigger, images, commands, logs
+src/devices.js                    Gladys devices (server + one per camera), feature names (4 languages), values
+src/blueiris/client.js            JSON interface: MD5 login, session renewal, no retry of a refused password, images
+src/blueiris/http.js              the HTTP seam (node:http/https), replaced by the fake server in tests
+src/blueiris/model.js             what the answers mean: status, camlist, alertlist (flags, AI memo), ptz, rights
+src/image.js                      camera image <= 150 KB: asks Blue Iris for smaller sizes, decodes nothing
 src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+src/widgets.js                    dashboard widget `blue_iris` (manifest `widgets`)
+src/texts.js                      status, error, report, command and detection texts (4 languages)
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
+src/store.js                      /data/blue-iris-state.json (server identity, cameras, presets, AI seen)
+scripts/probe.mjs                 read-only probe of a real server (not in the image)
 gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (en and fr mandatory)
 test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+                                  and helpers/fakeBlueIris.js (built from test/fixtures/blueiris)
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +78,10 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in English, French, German and Spanish: action
+  messages, widget content, feature names, manifest texts, and
+  `docs/en.md`, `docs/fr.md`, `docs/de.md`, `docs/es.md`, kept in sync
+  (`test/i18n.test.js` checks the languages and the doc sections).
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -233,3 +243,51 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## Blue Iris : l'API et les pièges de cette intégration
+
+Sources : l'interface web UI3 livrée avec Blue Iris (`bp2008/ui3`, LGPL-3.0 : lue, jamais copiée),
+`kramttocs/ha-blueiris` (Apache-2.0, commit 7625752 du 02/10/2026) et `elad-bar/ha-blueiris` (sans
+licence : lu seulement). Aucun serveur Blue Iris n'a été testé : `scripts/probe.mjs` est à lancer par
+l'orchestrateur sur un vrai serveur (il affiche les noms des champs de chaque réponse).
+
+- **Connexion** : `POST /json`. `{ cmd: "login" }` répond `result: "fail"` avec une `session` (raison
+  « missing response ») : c'est le défi, pas une erreur. Puis `response = md5("user:session:password")`.
+  Une session expirée répond `fail` « Invalid session » (sans raison avant 5.8.1.1) : se reconnecter
+  **une** fois. Un second login refusé = mauvais mot de passe : arrêt (`blocked`), jamais de boucle,
+  Blue Iris bannit l'adresse après quelques échecs (« auto-ban »). La session vaut le mot de passe :
+  jamais dans un journal (un test le vérifie).
+- **Droits** (données du login, comme UI3) : `admin`, `changeprofile` (défaut = `admin`), `ptz`
+  (défaut vrai). Un simple utilisateur avec « changer de profil » suffit pour armer ; `trigger` exige
+  un administrateur.
+- **status** : `signal` "0" rouge, "1" vert, "2" jaune (transition d'armement : UI3 envoie 2 en
+  armant ; ici on envoie 1, non vérifié) ; `profile` 0-7, le 0 « Inactive » ne déclenche rien ;
+  `lock` 0 le planning tourne, 1 tenu, 2 temporaire. **Un profil envoyé une fois est temporaire,
+  envoyé deux fois il est tenu** (logique des intégrations HA : renvoyer si `lock !== 1`). `disks` en
+  **Mio** (`allocated`, `used`, `free`) ; vieux serveurs : texte `clips` « …, 1.2T/2.0T; ».
+- **camlist** : `index` (toutes les caméras) et `@index` (cycle) sont des entrées système, une entrée
+  avec `group` est un groupe : écartés. `optionValue` = nom court, l'identifiant de toutes les
+  commandes (et de l'`external_id`). `alertutc` (epoch s de la dernière alerte) dit quand lire
+  `alertlist`.
+- **alertlist** (`camera` = nom court ou `index`, `view: "alerts"`, `startdate`/`enddate` en epoch s) :
+  `flags` de UI3 (`BIDBFLAG`) : mouvement 1<<17, audio 1<<19, externe 1<<20, annulée 1<<23,
+  IA personne 1<<26, IA véhicule 1<<27, confirmée 1<<28 ; `memo` « person:87%,car:62% ». Au démarrage,
+  les alertes des 24 h servent de référence (rien ne se déclenche) ; une caméra apparue ensuite aussi.
+- **PTZ** : boutons 0 gauche, 1 droite, 2 haut, 3 bas, 4 home, 5 zoom +, 6 zoom −, 64 stop, 101-120
+  positions. Un bouton sans `updown` est une action « sûre » (presets) ; `updown: 1` démarre un
+  mouvement continu, `updown: 0` l'arrête. Le cœur exige un chien de garde : 2 s ici, arrêt réessayé
+  une fois, arrêt de tout mouvement à l'extinction. Les presets viennent de `{ cmd: "ptz", camera }`
+  (`presetnum`, `presets` en noms ou `{ num, desc }`).
+- **Images** : `/image/<court>?w=&q=&session=` ; Blue Iris redimensionne lui-même, donc aucune
+  bibliothèque d'image : redemander plus petit jusqu'à 150 Ko. Une page HTML de login en 200 = session
+  expirée.
+- **Le validateur d'image de widget du SDK lit l'en-tête SOF du JPEG** : un faux JPEG de test doit
+  avoir un vrai segment SOF0, pas seulement `FF D8`.
+- **`text/select` avec valeurs texte** : profil "0".."7" et signal `green`/`yellow`/`red` (le cœur
+  n'accepte les valeurs texte que sur `text/select`). L'état se publie `{ text }`.
+- **Désarmer n'est jamais un interrupteur** : signal rouge, profil 0 et profils listés dans
+  `disarmed_profiles` refusés tant que `allow_disarm` est faux, par la fonctionnalité, l'action de
+  scène et le widget (bouton « Désarmer » avec confirmation seulement si autorisé).
+- Pas d'événements poussés : Blue Iris les pousse par MQTT ou appel web, que le conteneur en pont ne
+  reçoit pas. D'où la lecture toutes les 10 s par défaut (serveur local, sans quota).
+- Le faux Gladys enregistre les transports sous `device_external_id`, pas `external_id`.
