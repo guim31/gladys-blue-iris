@@ -8,8 +8,8 @@
     "de": "Blue-Iris-Videoüberwachung lokal: Bilder, Bewegung, KI-Alarme, Profile, PTZ.",
     "es": "Videovigilancia Blue Iris en local: imágenes, movimiento, alertas IA, perfiles, PTZ."
   },
-  "version": "1.0.0",
-  "docker_image": "ghcr.io/guim31/gladys-blue-iris:1.0.0",
+  "version": "1.0.1",
+  "docker_image": "ghcr.io/guim31/gladys-blue-iris:1.0.1",
   "gladys_version": ">=5.1.0",
   "cover_image": "https://raw.githubusercontent.com/guim31/gladys-blue-iris/main/cover.png",
   "categories": ["security"],

@@ -1,6 +1,6 @@
 {
   "name": "gladys-blue-iris",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Blue Iris integration for Gladys Assistant: cameras, motion, AI alerts, profiles and PTZ over the local JSON interface.",
   "type": "module",

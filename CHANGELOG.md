@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-15
+
 ### Added
 
 - Blue Iris integration, local only, through the JSON interface of Blue Iris
@@ -30,4 +32,5 @@ the notes of the version's GitHub Release.
 - "Test the connection" action, four languages (English, French, German,
   Spanish), documentation in the four.
 
-[Unreleased]: https://github.com/guim31/gladys-blue-iris/commits/main
+[Unreleased]: https://github.com/guim31/gladys-blue-iris/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/guim31/gladys-blue-iris/releases/tag/v1.0.1
